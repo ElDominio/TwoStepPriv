@@ -8,30 +8,31 @@
 #include "normanTools.h"
 
 //Pin assignments
-byte RPMinputPin = 3;
-byte SparkOutput = 7;
-byte ArmTriggerPin = 5;
-byte bluePin = 9;
-byte redPin = 10;
+uint8_t RPMinputPin = 3;
+uint8_t SparkOutput = 7;
+uint8_t ArmTriggerPin = 5;
+uint8_t bluePin = 9;
+uint8_t redPin = 10;
 
-byte analogIn = A4;
+uint8_t analogIn = A4;
 
-byte pinOne = A0;
-byte pinTwo = A1;
-byte pinThree = A2;
-byte pinFour = A3;
+uint8_t pinOne = A0;
+uint8_t pinTwo = A1;
+uint8_t pinThree = A2;
+uint8_t pinFour = A3;
 
 //Program variables
-unsigned int cutRPM;
+uint16_t cutRPM;
 
-unsigned int timeToCut; 
-//int armVoltage;
-byte positionCheckcount = 0;
-byte potPosition;
-byte cylCount = 4;
-byte RPMerror = 0;
+uint16_t timeToCut; 
+//int16_t armVoltage;
+uint8_t positionCheckcount = 0;
+uint8_t potPosition;
+uint8_t cylCount = 4;
+uint8_t RPMerror = 0;
+uint8_t trigNumber = 0;
 
-byte bitField = B11000101; //field of working bits for states; first bit is 7, last is 0
+uint8_t bitField = B11000101; //field of working bits for states; first bit is 7, last is 0
 
 #define BIT_POS_REP_FLAG  0 //Position Report enabled
 #define BIT_DIAG_REQUEST  1 
@@ -44,53 +45,50 @@ byte bitField = B11000101; //field of working bits for states; first bit is 7, l
 
 
 //Working Variables
-unsigned int RPM;
-unsigned int RPMold;
-unsigned long times;
-unsigned long timeOld;
-byte oldPotPos = 0;
+uint16_t RPM;
+uint16_t RPMold;
+uint32_t times;
+uint32_t timeOld;
+uint8_t oldPotPos = 0;
 //bool correctionFlag = false;
-byte trigCounter;
-unsigned long positionReport = 0;
+uint8_t trigCounter;
+uint32_t positionReport = 0;
 
 //toyota function
-unsigned int toyotaDivision = 0;
+uint16_t toyotaDivision = 0;
 uint16_t timeCount = 0;
-uint32_t timeTick = 0;
-bool timeTickOK = true;
+unsigned long timeTick = 0;
 byte fakePin = 2;
 byte fakePinTwo = 4;
 bool fakeOut = false;
-byte toyoCyl = 6;
+uint8_t toyoCyl = 6;
 
 void setup() {
-	//Begin Serial comms
-	Serial.begin(115200);
+  //Begin Serial comms
+  Serial.begin(115200);
 
-	//Set I/O
-	pinMode(SparkOutput, OUTPUT);
+  //Set I/O
+  pinMode(SparkOutput, OUTPUT);
  pinMode(bluePin,OUTPUT);
  pinMode(redPin,OUTPUT);
  pinMode(fakePin, OUTPUT);
-  pinMode(fakePinTwo, OUTPUT);
-
 	pinMode(ArmTriggerPin, INPUT_PULLUP);
 	pinMode(RPMinputPin, INPUT);
   pinMode(pinOne, INPUT_PULLUP);pinMode(pinTwo, INPUT_PULLUP);pinMode(pinThree, INPUT_PULLUP);pinMode(pinFour, INPUT_PULLUP);
-	digitalWrite(SparkOutput, HIGH); //activate spark output
+  digitalWrite(SparkOutput, HIGH); //activate spark output
 
   digitalWrite(bluePin,HIGH);
    Serial.println("Box Ready");
-//	 Serial.println(bitField);
-   	//Initialize variables
-	 RPM = 0;
-	 RPMold = 0;
-	 trigCounter = 0;
-	 timeOld = 0;
-	 times = 0;
+//   Serial.println(bitField);
+    //Initialize variables
+   RPM = 0;
+   RPMold = 0;
+   trigCounter = 0;
+   timeOld = 0;
+   times = 0;
   cutRPM = 4000;
-	 /*armTriggerbool = false;
-	 bitSet(bitField, BIT_SPARK_STATE);*/
+   /*armTriggerbool = false;
+   bitSet(bitField, BIT_SPARK_STATE);*/
   //bitClear(bitField, BIT_DIAG_REQUEST);
   //bitSet(bitField, BIT_RPM_FILTER);
   //Serial.println(bitField);
@@ -98,7 +96,7 @@ void setup() {
   trigCounter = 0;
   timeToCut = 5;
   bitSet(bitField, BIT_SPARK_STATE);
-	//cylCount = EEPROM.read(70);
+  //cylCount = EEPROM.read(70);
   potPosition = (8*!digitalRead(pinFour)) + (4*!digitalRead(pinThree)) +(2*!digitalRead(pinTwo)) +(!digitalRead(pinOne)) ;
   if (EEPROM.read(255) != 23){
     writeDefaultSettings();
@@ -110,7 +108,7 @@ void setup() {
     cylCount = 4;
   }
 
-	 //Attach RPM input interrupt
+   //Attach RPM input interrupt
   attachInterrupt(digitalPinToInterrupt(3), triggerCounter, RISING);
 }
 
@@ -135,7 +133,7 @@ void loop() {
   //Serial.println(digitalRead(ArmTriggerPin));
 
 
-  if (trigCounter > 0){
+  if (trigCounter > trigNumber){
     RPMcounter();
   }
   if ((micros()- timeOld) > 670180){
@@ -179,18 +177,16 @@ void loop() {
 }
 
 void toyotaFunction(){
-  if (trigCounter > 0){
-		toyotaDivision = (times/toyoCyl)/100;
-		// divides the current time between pulses by the number of cylinders to obtain the time one output will fire
-   //times is the amount of time it took for one cycle
-   timeTick=micros()/100;
-  }
-   if(((((micros()/100)- timeTick) % toyotaDivision) == 0) && (timeTickOK)){
-    timeCount++;
-    timeTickOK = false;
-    //Serial.print("milllis - timeTick = "); Serial.println(millis()-timeTick);
-  //  Serial.print(" ticking ttiime = ");Serial.println(timeCount);
-     if (!bitRead(bitField, BIT_SPARK_STATE)){
+	if(micros() > timeTick){
+		toyotaDivision = times/toyoCyl;
+		timeTick = micros();
+		timeCount++;
+    //Serial.print(timeCount); Serial.print(" > "); Serial.println(toyotaDivision);
+		if(timeCount > toyotaDivision){
+			timeCount = 0;
+			//bitSet(bitField, BIT_TOYOTA_FAKE);
+         // Serial.println(fakeOut);
+      if (!bitRead(bitField, BIT_SPARK_STATE)){
         if (toyoCyl == 4){
           digitalWrite(fakePin, HIGH);
         //  Serial.println("4 cyl output high");
@@ -199,24 +195,21 @@ void toyotaFunction(){
         else if (toyoCyl == 6){
           fakeOut = !fakeOut;
           digitalWrite(fakePin, fakeOut);
-          digitalWrite(fakePinTwo, !fakeOut);
-          if(timeCount > 5){ timeCount = 0;}
+  			  digitalWrite(fakePinTwo, !fakeOut);
         }
       }
-   }
-   else if( ((!timeTickOK) && (((micros()/100) - timeTick) % toyotaDivision)) == 0 ){}
-   else{ 
-      timeTickOK = true;
-      if(toyoCyl == 4){
-       // if((((micros()/100) - timeTick) % (toyotaDivision + (toyotaDivision/2))) == 0){
-          digitalWrite(fakePin, LOW);
-       // }
-      }
-    }
+		}
+		if(timeCount > 1000){
+			//bitClear(bitField, BIT_TOYOTA_FAKE);
+        //  Serial.println(bitRead(bitField, BIT_TOYOTA_FAKE));
+			digitalWrite(fakePin, LOW);
+      digitalWrite(fakePinTwo, LOW);
+		}
+	}
 }
 
 void SerialDiag(){
-  unsigned int posRep = millis() - positionReport;
+  uint16_t posRep = millis() - positionReport;
   
   if (posRep >= 3000){
     Serial.print("Pot POsition: "); Serial.println(potPosition);
@@ -250,15 +243,15 @@ void SerialComms(){
  *  Example Message:
  *  w0;205;50;
  */
-    int i = 0;
+    int16_t i = 0;
     bool eepromFlag = false;
    /* Serial.println(F("Write mode activated, please enter the pot position (followed by a semicolon ';'"));
     Serial.println(F("then the desired cut RPMs, followed by a semicolon,"));
     Serial.println(F("and the the desired cut time, in ms, followed by a semicolon."));
     Serial.println(F("Ex. w14;3500;50; saves a 3500 RPM and 50ms cut to position 14"));*/
     while (i < 4){
-      byte serialByte;
-      int serialInt;
+      uint8_t serialByte;
+      int16_t serialInt;
         while (i == 0){
           if (Serial.available()){
             serialByte = Serial.read();
@@ -274,8 +267,8 @@ void SerialComms(){
           }
         }
         while (i == 1){
-         byte readRPM[4];
-         byte digits = 0;
+         uint8_t readRPM[4];
+         uint8_t digits = 0;
          while (digits < 4){
           if(Serial.available()){
             readRPM[digits] = Serial.read()-48;
@@ -287,7 +280,7 @@ void SerialComms(){
          }
           i++;
           cutRPM = 0;
-          for (int i = 0; i < digits; i++){
+          for (int16_t i = 0; i < digits; i++){
            // Serial.print(cutRPM);Serial.print(" + ");Serial.println(readRPM[i]*powint(10,digits-i-1));
             cutRPM = cutRPM + readRPM[i]*powint(10,digits-i-1);
             
@@ -298,8 +291,8 @@ void SerialComms(){
            if (Serial.peek() == 59){ Serial.read();}
         }
         while ( i == 2 ){
-          byte readDC[4];
-         byte digits = 0;
+          uint8_t readDC[4];
+         uint8_t digits = 0;
          while (digits < 4){
           if(Serial.available()){
             readDC[digits] = Serial.read()-48;
@@ -309,7 +302,7 @@ void SerialComms(){
          }
           i++;
           timeToCut = 0;
-          for (int i = 0; i < digits; i++){
+          for (int16_t i = 0; i < digits; i++){
             timeToCut = timeToCut + readDC[i]*powint(10,digits-i-1);
           }
             Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.print(timeToCut);Serial.print("rpm");
@@ -346,7 +339,7 @@ void SerialComms(){
     bitWrite(bitField, BIT_TOYOTA_FAKE, !(bitRead(bitField, BIT_TOYOTA_FAKE)));
     EEPROM.update(72,(bitRead(bitField, BIT_TOYOTA_FAKE)));
     Serial.print(F("Toyota output inverted:"));Serial.println(bitRead(bitField, BIT_TOYOTA_FAKE));
-    char tempCyl = 0;
+    /*char tempCyl = 0;
     Serial.println("Enter 'f' for 4 cylinder Toyota, or 's' for six cylinder Toyota");
     while ( tempCyl == 0){
        if (Serial.available()){tempCyl = Serial.read();}
@@ -373,8 +366,8 @@ void SerialComms(){
     Serial.print(F("RPM Filter inverted: "));Serial.println(bitRead(bitField, BIT_RPM_FILTER));
   }
   else if (commandChar == 'c'){
-    byte i = 0;
-    Serial.println(F("Enter 'd' for distributor, 'w' for wasted spark, or 'c' for Coil On Plug"));
+    uint8_t i = 0;
+   // Serial.println(F("Enter 'd' for distributor, 'w' for wasted spark, or 'c' for Coil On Plug"));
     while (i < 1){
       if (Serial.available()){
         char serialRead = Serial.read();
@@ -395,7 +388,7 @@ void SerialComms(){
         }
       } // end serial avail
     }// end while
-    Serial.print(F("Spark mode set! Current mode is: "));Serial.println(cylCount);
+    Serial.print(("Spark mode set! Current mode is: "));Serial.println(cylCount);
   }// end C case
 }
 
@@ -445,13 +438,13 @@ void ignControl(){
 
 
 void loadCalibration(){
-  byte tempPotPos = (8*!digitalRead(pinFour)) + (4*!digitalRead(pinThree)) +(2*!digitalRead(pinTwo)) +(!digitalRead(pinOne));
-    Serial.print(("tempPotPos = "));Serial.println(tempPotPos);
+  uint8_t tempPotPos = (8*!digitalRead(pinFour)) + (4*!digitalRead(pinThree)) +(2*!digitalRead(pinTwo)) +(!digitalRead(pinOne));
+   // Serial.print(("tempPotPos = "));Serial.println(tempPotPos);
     
     cutRPM = word(EEPROM.read(tempPotPos+tempPotPos), EEPROM.read(tempPotPos+tempPotPos+1));
-    Serial.print("cutRPM: ");Serial.println(cutRPM);
+  //  Serial.print("cutRPM: ");Serial.println(cutRPM);
     timeToCut = word(EEPROM.read(tempPotPos+tempPotPos+32), EEPROM.read(tempPotPos+tempPotPos+33));
-    Serial.print("RPM hysterisis: ");Serial.println(timeToCut);
+   // Serial.print("RPM hysterisis: ");Serial.println(timeToCut);
     cylCount = EEPROM.read(70);
     bitWrite(bitField, BIT_CLUTCH_LOGIC, EEPROM.read(71));
     bitWrite(bitField, BIT_TOYOTA_FAKE, EEPROM.read(72));
@@ -459,3 +452,38 @@ void loadCalibration(){
     toyoCyl = EEPROM.read(74);
 
 }
+
+uint32_t timeTick = 0;
+bool timeTickOK = true;
+byte fakePin = 2;
+byte fakePinTwo = 4;
+  pinMode(fakePinTwo, OUTPUT);
+
+	pinMode(ArmTriggerPin, INPUT_PULLUP);
+	pinMode(RPMinputPin, INPUT);
+  if (trigCounter > 0){
+		toyotaDivision = (times/toyoCyl)/100;
+		// divides the current time between pulses by the number of cylinders to obtain the time one output will fire
+   //times is the amount of time it took for one cycle
+   timeTick=micros()/100;
+  }
+   if(((((micros()/100)- timeTick) % toyotaDivision) == 0) && (timeTickOK)){
+    timeCount++;
+    timeTickOK = false;
+    //Serial.print("milllis - timeTick = "); Serial.println(millis()-timeTick);
+  //  Serial.print(" ticking ttiime = ");Serial.println(timeCount);
+     if (!bitRead(bitField, BIT_SPARK_STATE)){
+          digitalWrite(fakePinTwo, !fakeOut);
+          if(timeCount > 5){ timeCount = 0;}
+   }
+   else if( ((!timeTickOK) && (((micros()/100) - timeTick) % toyotaDivision)) == 0 ){}
+   else{ 
+      timeTickOK = true;
+      if(toyoCyl == 4){
+       // if((((micros()/100) - timeTick) % (toyotaDivision + (toyotaDivision/2))) == 0){
+          digitalWrite(fakePin, LOW);
+       // }
+      }
+    }
+    char tempCyl = 0;
+    Serial.println("Enter 'f' for 4 cylinder Toyota, or 's' for six cylinder Toyota");

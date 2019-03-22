@@ -1,4 +1,4 @@
-/* Memory Mapping
+ /* Memory Mapping
  *  0 - mode
  *  1 - timeToCut
  *  2,3 - high/lowByte of highRPM
@@ -56,7 +56,8 @@ unsigned long positionReport = 0;
 //toyota function
 unsigned int toyotaDivision = 0;
 uint16_t timeCount = 0;
-unsigned long timeTick = 0;
+uint32_t timeTick = 0;
+bool timeTickOK = true;
 byte fakePin = 2;
 byte fakePinTwo = 4;
 bool fakeOut = false;
@@ -71,6 +72,8 @@ void setup() {
  pinMode(bluePin,OUTPUT);
  pinMode(redPin,OUTPUT);
  pinMode(fakePin, OUTPUT);
+  pinMode(fakePinTwo, OUTPUT);
+
 	pinMode(ArmTriggerPin, INPUT_PULLUP);
 	pinMode(RPMinputPin, INPUT);
   pinMode(pinOne, INPUT_PULLUP);pinMode(pinTwo, INPUT_PULLUP);pinMode(pinThree, INPUT_PULLUP);pinMode(pinFour, INPUT_PULLUP);
@@ -176,33 +179,40 @@ void loop() {
 }
 
 void toyotaFunction(){
-	if(micros() > timeTick){
-		toyotaDivision = times/toyoCyl;
-		timeTick = micros();
-		timeCount++;
-    //Serial.print(timeCount); Serial.print(" > "); Serial.println(toyotaDivision);
-		if(timeCount > toyotaDivision){
-			timeCount = 0;
-			//bitSet(bitField, BIT_TOYOTA_FAKE);
-         // Serial.println(fakeOut);
-      if (!bitRead(bitField, BIT_SPARK_STATE)){
+  if (trigCounter > 0){
+		toyotaDivision = (times/toyoCyl)/100;
+		// divides the current time between pulses by the number of cylinders to obtain the time one output will fire
+   //times is the amount of time it took for one cycle
+   timeTick=micros()/100;
+  }
+   if(((((micros()/100)- timeTick) % toyotaDivision) == 0) && (timeTickOK)){
+    timeCount++;
+    timeTickOK = false;
+    //Serial.print("milllis - timeTick = "); Serial.println(millis()-timeTick);
+  //  Serial.print(" ticking ttiime = ");Serial.println(timeCount);
+     if (!bitRead(bitField, BIT_SPARK_STATE)){
         if (toyoCyl == 4){
           digitalWrite(fakePin, HIGH);
+        //  Serial.println("4 cyl output high");
+          if(timeCount > 3){ timeCount = 0;}
         }
         else if (toyoCyl == 6){
           fakeOut = !fakeOut;
           digitalWrite(fakePin, fakeOut);
-  			  digitalWrite(fakePinTwo, !fakeOut);
+          digitalWrite(fakePinTwo, !fakeOut);
+          if(timeCount > 5){ timeCount = 0;}
         }
       }
-		}
-		if(timeCount > 1000){
-			//bitClear(bitField, BIT_TOYOTA_FAKE);
-        //  Serial.println(bitRead(bitField, BIT_TOYOTA_FAKE));
-			digitalWrite(fakePin, LOW);
-      digitalWrite(fakePinTwo, LOW);
-		}
-	}
+   }
+   else if( ((!timeTickOK) && (((micros()/100) - timeTick) % toyotaDivision)) == 0 ){}
+   else{ 
+      timeTickOK = true;
+      if(toyoCyl == 4){
+       // if((((micros()/100) - timeTick) % (toyotaDivision + (toyotaDivision/2))) == 0){
+          digitalWrite(fakePin, LOW);
+       // }
+      }
+    }
 }
 
 void SerialDiag(){
@@ -336,7 +346,7 @@ void SerialComms(){
     bitWrite(bitField, BIT_TOYOTA_FAKE, !(bitRead(bitField, BIT_TOYOTA_FAKE)));
     EEPROM.update(72,(bitRead(bitField, BIT_TOYOTA_FAKE)));
     Serial.print(F("Toyota output inverted:"));Serial.println(bitRead(bitField, BIT_TOYOTA_FAKE));
-    /*char tempCyl = 0;
+    char tempCyl = 0;
     Serial.println("Enter 'f' for 4 cylinder Toyota, or 's' for six cylinder Toyota");
     while ( tempCyl == 0){
        if (Serial.available()){tempCyl = Serial.read();}
@@ -355,7 +365,7 @@ void SerialComms(){
         toyoCyl = 0;
         tempCyl = 0;
        }
-    }*/
+    }
   }
   else if (commandChar == 'f'){
     bitWrite(bitField, BIT_RPM_FILTER, !(bitRead(bitField, BIT_RPM_FILTER)));
@@ -446,6 +456,6 @@ void loadCalibration(){
     bitWrite(bitField, BIT_CLUTCH_LOGIC, EEPROM.read(71));
     bitWrite(bitField, BIT_TOYOTA_FAKE, EEPROM.read(72));
     bitWrite(bitField, BIT_RPM_FILTER, EEPROM.read(73));
-   // toyoCyl = EEPROM.read(74);
+    toyoCyl = EEPROM.read(74);
 
 }

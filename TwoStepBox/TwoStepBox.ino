@@ -240,7 +240,7 @@ void SerialDiag(){
 
 void SerialComms(){
   char commandChar = Serial.read();
-  if (commandChar == 'w'){ //write command
+  if (commandChar == 'p'){ //write command
     /* Memory Mapping
  *  0 - potposition
  *  1 - RPM hibyte
@@ -251,31 +251,24 @@ void SerialComms(){
  *  w0;205;50;
  */
     int i = 0;
-    bool eepromFlag = false;
-   /* Serial.println(F("Write mode activated, please enter the pot position (followed by a semicolon ';'"));
-    Serial.println(F("then the desired cut RPMs, followed by a semicolon,"));
-    Serial.println(F("and the the desired cut time, in ms, followed by a semicolon."));
-    Serial.println(F("Ex. w14;3500;50; saves a 3500 RPM and 50ms cut to position 14"));*/
     while (i < 4){
       byte serialByte;
       int serialInt;
+      Serial.println(F("Entrar un numero del 0-9 (corresponden a 1-10) para la posicion\r\nque desea grabar"));
         while (i == 0){
           if (Serial.available()){
             serialByte = Serial.read();
-            if( serialByte == 59){
-              i++;
-              //Serial.println("Breaking");
-              break;
-            }
             serialByte = serialByte - 48;
-            serialByte = constrain(serialByte, 0, 10);
+            serialByte = constrain(serialByte, 0, 9);
             potPosition = serialByte;
-            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(potPosition);
+            i++;
           }
         }
-        while (i == 1){
+        while (i == 1){ // enter RPM dialog
          byte readRPM[4];
          byte digits = 0;
+         Serial.print(F("La posicion que se esta editando es: "));Serial.println(potPosition);Serial.println(F("------"));
+         Serial.println(F("Entrar los RPM que desea que se active el corte"));
          while (digits < 4){
           if(Serial.available()){
             readRPM[digits] = Serial.read()-48;
@@ -285,7 +278,6 @@ void SerialComms(){
             digits++;
           }
          }
-          i++;
           cutRPM = 0;
           for (int i = 0; i < digits; i++){
            // Serial.print(cutRPM);Serial.print(" + ");Serial.println(readRPM[i]*powint(10,digits-i-1));
@@ -294,12 +286,14 @@ void SerialComms(){
           }           
           //cutRPM = readRPM[0]*1000 + readRPM[1]*100 + readRPM[2]*10 +readRPM[3];
           cutRPM = constrain(cutRPM, 0, 8000);
-           Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.println(cutRPM);
-           if (Serial.peek() == 59){ Serial.read();}
+          i++;
         }
-        while ( i == 2 ){
-          byte readDC[4];
+        while ( i == 2 ){ // enter cut time dialog
+          byte readDC[4] ={255, 255, 255, 255};
          byte digits = 0;
+         Serial.print(F("Los RPM de corte entrados fueron: ")); Serial.println(cutRPM);Serial.println(F("------"));
+         Serial.println(F("Entre la ventana de corte deseada.\r\nEj. Si el corte esta a 4000RPM y desactive el corte a 3800RPM,\r\nentre 200, 4000-200 = 3800"));
+         Serial.println(F("**Si usa un numero menor de 1000, por favor\r\nescriba ';' como su ultimo digito, sin los colchetes**"));
          while (digits < 4){
           if(Serial.available()){
             readDC[digits] = Serial.read()-48;
@@ -307,18 +301,15 @@ void SerialComms(){
             digits++;
           }
          }
-          i++;
           timeToCut = 0;
           for (int i = 0; i < digits; i++){
             timeToCut = timeToCut + readDC[i]*powint(10,digits-i-1);
           }
-            Serial.print("i = "); Serial.print(i);Serial.print(" ");Serial.print(timeToCut);Serial.print("rpm");
-            Serial.println("");
-            if (Serial.peek() == 59){ Serial.read();}
-         
-          }
+         i++;
+         }
       if ( i == 3){
-          Serial.print("i = "); Serial.print(i);Serial.print(" ");
+         Serial.print(F("La ventana de corte es: "));Serial.println(timeToCut);
+         Serial.print(F("Resultando en un punto de reactivacion a "));Serial.println(cutRPM-timeToCut);Serial.println(F("------"));
           burnCalibration(potPosition, cutRPM, timeToCut);
           i++; // i == 4
       }

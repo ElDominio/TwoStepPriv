@@ -292,8 +292,8 @@ void SerialComms(){
           byte readDC[4] ={255, 255, 255, 255};
          byte digits = 0;
          Serial.print(F("Los RPM de corte entrados fueron: ")); Serial.println(cutRPM);Serial.println(F("------"));
-         Serial.println(F("Entre la ventana de corte deseada.\r\nEj. Si el corte esta a 4000RPM y desactive el corte a 3800RPM,\r\nentre 200, 4000-200 = 3800"));
-         Serial.println(F("**Si usa un numero menor de 1000, por favor\r\nescriba ';' como su ultimo digito, sin los colchetes**"));
+         Serial.println(F("Entre la ventana de corte deseada.\r\nEj. Si el corte activa a 4000RPM y desea que desactive el corte a 3800RPM,\r\nescriba 200, 4000-200 = 3800"));
+         Serial.println(F("**Si usa un numero menor de 1000, por favor\r\nescriba ';' como su ultimo digito. Ej. 200; **"));
          while (digits < 4){
           if(Serial.available()){
             readDC[digits] = Serial.read()-48;
@@ -330,7 +330,7 @@ void SerialComms(){
 
     bitWrite(bitField, BIT_CLUTCH_LOGIC, !(bitRead(bitField, BIT_CLUTCH_LOGIC)));
     EEPROM.update(71,(bitRead(bitField, BIT_CLUTCH_LOGIC)));
-    Serial.println(F("Clutch logic inverted!"));
+    Serial.println(F("Señal de 2step invertida!"));
   }// end I case
 
   else if (commandChar == 't'){
@@ -352,7 +352,7 @@ void SerialComms(){
         Serial.println("Six cyl set!");
        }
        else{
-        Serial.println("Please enter a valid value!");
+       // Serial.println("Please enter a valid value!");
         toyoCyl = 0;
         tempCyl = 0;
        }
@@ -365,7 +365,7 @@ void SerialComms(){
   }
   else if (commandChar == 'c'){
     byte i = 0;
-    Serial.println(F("Enter 'd' for distributor, 'w' for wasted spark, or 'c' for Coil On Plug"));
+    Serial.println(F("Entre 'd' para bobina sencilla, 'w' para wasted spark, o 'c' para Coil On Plug"));
     while (i < 1){
       if (Serial.available()){
         char serialRead = Serial.read();
@@ -386,7 +386,7 @@ void SerialComms(){
         }
       } // end serial avail
     }// end while
-    Serial.print(F("Spark mode set! Current mode is: "));Serial.println(cylCount);
+    Serial.print(F("Modo de bobina listo! Modo actual es: "));Serial.println(cylCount);
   }// end C case
 }
 
